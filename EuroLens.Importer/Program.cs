@@ -18,12 +18,32 @@ try {
 // Open the ZIP file and read the CSV inside it
 using var stream = new MemoryStream(data);            // Wrap the bytes in a stream 
 using var zip = new ZipArchive(stream);               // Open the stream as a ZIP archive
-var csvEntry = zip.Entries[0];                        // Open first and only entry
+var csvEntry = zip.Entries[0];                        // Open the first and only entry
 using var reader = new StreamReader(csvEntry.Open()); // Read the CSV as text
 
-// Show the first 3 lines
-for (int i = 0; i < 3; i++)
-{
-    var line = reader.ReadLine(); 
-    Console.WriteLine(line);
+var header = await reader.ReadLineAsync();            // Read only the header to extract info
+if (header == null) {
+    Console.WriteLine("ERROR: The CSV file is empty.");
+    return;
+}
+
+string[] currencies = header.Split(",");              // Get each currency + date
+Console.WriteLine($"There are {currencies.Length - 2} currencies available");
+                                                      // Minus the date and the trailing comma
+Console.WriteLine("\nDate | Currency | Value");           // Print header
+
+string?line;
+while ((line = await reader.ReadLineAsync())!= null) {  // Read async until null
+    string[] lineInfo = line.Split(",");
+
+    for (int i = 1; i < currencies.Length; i++) {
+
+        if (lineInfo[i] == "N/A" || lineInfo[i] == "") continue;    // Ignore N/A and empty space
+
+        string date = lineInfo[0];
+        Console.WriteLine($"{date} | {currencies[i]} | {lineInfo[i]}");
+    }
+
+break;
+ 
 }
