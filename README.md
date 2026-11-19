@@ -1,6 +1,6 @@
 <p align="center">
   <picture>
-    <img src="docs/logo_dark_no_back.png" alt="EuroLens logo" width="300">
+    <img src="docs/logo_dark_noback.png" alt="EuroLens logo" width="300">
   </picture>
 </p>
 
