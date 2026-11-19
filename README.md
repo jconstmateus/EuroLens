@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/logo_nobackground.png" alt="EuroLens logo" width="300">
+  <img src="docs/logo.png" alt="EuroLens logo" width="150">
 </p>
 
 # EuroLens
