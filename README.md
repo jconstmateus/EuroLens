@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="docs/logo.png" alt="EuroLens logo" width="150">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/logo_dark_noback.png">
+    <img src="docs/logo_no_back.png" alt="EuroLens logo" width="300">
+  </picture>
 </p>
 
 # EuroLens
