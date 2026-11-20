@@ -1,5 +1,6 @@
 ﻿// This program runs daily and downloads the ECB history file via an HTTP request
 using System.IO.Compression;
+using System.Globalization;
 
 using var client = new HttpClient();
 
@@ -27,23 +28,25 @@ if (header == null) {
     return;
 }
 
-string[] currencies = header.Split(",");              // Get each currency + date
+string[] currencies = header.Split(",");                // Get each currency + date
 Console.WriteLine($"There are {currencies.Length - 2} currencies available");
-                                                      // Minus the date and the trailing comma
-Console.WriteLine("\nDate | Currency | Value");           // Print header
+                                                        // Minus the date and the trailing comma
+
+var rates = new List<ExchangeRate>();                   // Create a new list of Exchange Rates records
 
 string?line;
 while ((line = await reader.ReadLineAsync())!= null) {  // Read async until null
     string[] lineInfo = line.Split(",");
 
+    DateOnly date = DateOnly.Parse(lineInfo[0], CultureInfo.InvariantCulture);      // Parse the date using the invariant culture (ECB format: yyyy-MM-dd)
+
     for (int i = 1; i < currencies.Length; i++) {
 
-        if (lineInfo[i] == "N/A" || lineInfo[i] == "") continue;    // Ignore N/A and empty space
+        if (lineInfo[i] == "N/A" || lineInfo[i] == "") continue;                    // Ignore N/A and empty space
 
-        string date = lineInfo[0];
-        Console.WriteLine($"{date} | {currencies[i]} | {lineInfo[i]}");
+        decimal value = decimal.Parse(lineInfo[i], CultureInfo.InvariantCulture);   // Parse with the invariant culture (ECB file uses a dot as decimal separator)
+        rates.Add(new ExchangeRate(date, currencies[i], value));                    // Currency stay as a string
     }
-
-break;
- 
 }
+
+Console.WriteLine($"Read {rates.Count} rates");
