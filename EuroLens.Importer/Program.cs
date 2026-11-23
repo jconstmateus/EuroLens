@@ -1,6 +1,7 @@
 ﻿// This program runs daily and downloads the ECB history file via an HTTP request
 using System.IO.Compression;
 using System.Globalization;
+using Npgsql;
 
 using var client = new HttpClient();
 
@@ -50,3 +51,21 @@ while ((line = await reader.ReadLineAsync())!= null) {  // Read async until null
 }
 
 Console.WriteLine($"Read {rates.Count} rates");
+
+// Read the connection string from an environment variable (keeps the password out of the code)
+string? connectionString = Environment.GetEnvironmentVariable("EUROLENS_DB");
+if (connectionString == null)
+{
+    Console.WriteLine("ERROR: Environment variable EUROLENS_DB is not set.");
+    return;
+}
+
+// Open a connection to PostgreSQL
+await using var connection = new NpgsqlConnection(connectionString);
+await connection.OpenAsync();
+
+// Test query: how many rows are in the table?
+await using var command = new NpgsqlCommand("SELECT COUNT(*) FROM exchange_rates", connection);
+var count = await command.ExecuteScalarAsync();
+
+Console.WriteLine($"Rows in database: {count}");
