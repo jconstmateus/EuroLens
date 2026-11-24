@@ -2,6 +2,7 @@
 using System.IO.Compression;
 using System.Globalization;
 using Npgsql;
+using NpgsqlTypes;
 
 using var client = new HttpClient();
 
@@ -60,12 +61,59 @@ if (connectionString == null)
     return;
 }
 
-// Open a connection to PostgreSQL
+// Open connection to PostgreSQL
 await using var connection = new NpgsqlConnection(connectionString);
 await connection.OpenAsync();
 
-// Test query: how many rows are in the table?
-await using var command = new NpgsqlCommand("SELECT COUNT(*) FROM exchange_rates", connection);
-var count = await command.ExecuteScalarAsync();
+// --------------- Query 1: get the last date already in the database
+await using var lastDateCommand = new NpgsqlCommand(
+    "SELECT MAX(rate_date) FROM exchange_rates",
+    connection);
 
-Console.WriteLine($"Rows in database: {count}");
+var result = await lastDateCommand.ExecuteScalarAsync();   // Single value: the latest date, or NULL if the table is empty
+
+// The latest date as DateOnly, or null if the table is empty (first run)
+DateOnly? lastDate = result as DateOnly?;
+
+// --------------- Query 2: insert only the rates newer than lastDate
+// Single transaction: nothing is saved until the commit, and a failure saves nothing
+await using var transaction = await connection.BeginTransactionAsync();
+
+await using var loadLastRatesCommand = new NpgsqlCommand(
+    "INSERT INTO exchange_rates (rate_date, currency, rate) VALUES (@date, @currency, @rate) " +
+    "ON CONFLICT (rate_date, currency) DO NOTHING",   // Safety net: duplicates are ignored, never inserted twice
+    connection, transaction);
+
+// Create the parameters once; only their values change for each rate
+var dateParam = loadLastRatesCommand.Parameters.Add("date", NpgsqlDbType.Date);
+var currencyParam = loadLastRatesCommand.Parameters.Add("currency", NpgsqlDbType.Char);
+var rateParam = loadLastRatesCommand.Parameters.Add("rate", NpgsqlDbType.Numeric);
+
+await loadLastRatesCommand.PrepareAsync();   // PostgreSQL parses the SQL once and reuses it for every rate
+
+int inserted = 0;
+
+foreach (var rate in rates)
+{
+    // First run (no lastDate): insert everything. Otherwise: only dates newer than lastDate
+    if (lastDate == null || rate.Date > lastDate)
+    {
+        dateParam.Value = rate.Date;
+        currencyParam.Value = rate.Currency;
+        rateParam.Value = rate.Rate;
+        inserted += await loadLastRatesCommand.ExecuteNonQueryAsync();   // 1 if inserted, 0 if it already existed
+    }
+}
+
+await transaction.CommitAsync();   // Save all inserts at once
+
+// --------------- Query 3: count the total rows in the database
+await using var totalRowsCommand = new NpgsqlCommand(
+    "SELECT COUNT(*) FROM exchange_rates",
+    connection);
+
+var rows = Convert.ToInt64(await totalRowsCommand.ExecuteScalarAsync());   // Single value: the number of rows
+
+Console.WriteLine($"Last date in database: {lastDate?.ToString() ?? "first run: full load"}");
+Console.WriteLine($"Rates inserted in database: {inserted}");
+Console.WriteLine($"Total rows in database: {rows}");
